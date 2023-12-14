@@ -47,20 +47,24 @@ public class RateLimiter {
 
     System.out.println("from start " + ""+(time - limmiterStart));
     System.out.println("box number " + boxNumber);
-    System.out.println("from box start " + (time - (limmiterStart + boxNumber*timeWindowSeconds*1000)));
-    System.out.println("curr " + redis.get(""+boxNumber));
-    System.out.println("prev " + redis.get(""+(boxNumber-1)));
+    System.out.println("now " + time);
+    System.out.println("max " + (time - timeWindowSeconds * 1000));
 
-    double percentage = 1.5*((double) time - limmiterStart - boxNumber * timeWindowSeconds * 1000) / (timeWindowSeconds * 1000);
-    System.out.println("percentage " + percentage);
-    double requests = percentage * Double.parseDouble(redis.get(""+(boxNumber))) + (1 -percentage) * Double.parseDouble(redis.get(""+(boxNumber-1)));
-    System.out.println("requests "+requests);
-    if (requests > maxRequestCount) {
-      System.out.println(false);
-      return false;
+    System.out.println("from box start " + (time - (limmiterStart + boxNumber*timeWindowSeconds*1000)));
+
+    redis.zadd(label, (double) time, ""+time);
+    redis.zremrangeByScore(label, 0, time - timeWindowSeconds * 1000);
+
+    System.out.println(redis.zrangeByScore(label, 0, time));
+    long request_count = redis.zcard(label);
+
+    System.out.println("req " + request_count);
+    if (request_count <= maxRequestCount) {
+      System.out.println(true);
+      return true;
     }
-    System.out.println(true);
-    return true;
+    System.out.println(false);
+    return false;
   }
 
   public static void main(String[] args) {
