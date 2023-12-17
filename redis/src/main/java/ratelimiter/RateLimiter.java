@@ -13,7 +13,6 @@ public class RateLimiter {
   private final String label;
   private final long maxRequestCount;
   private final long timeWindowSeconds;
-  private long limiterStart;
 
   public RateLimiter(Jedis redis, String label, long maxRequestCount, long timeWindowSeconds) {
     this.redis = redis;
@@ -23,26 +22,14 @@ public class RateLimiter {
     redis.flushAll();
   }
 
-// скользящий журнал
-// проходит slidingWindowTest, но не проходит requestWithInsufficientIntervalsTest
-//  public boolean pass() {
-//    long time = System.currentTimeMillis();
-//    redis.zadd(label, (double) time, ""+time);
-//    redis.zremrangeByScore(label, 0, time - timeWindowSeconds * 1000);
-//    return redis.zcard(label) <= maxRequestCount;
-//  }
-
-//  фиксированное окно
   public boolean pass() {
-    if (limiterStart == 0) {
-      limiterStart = System.currentTimeMillis();
-    }
     long time = System.currentTimeMillis();
-    long boxNumber = (time - limiterStart) / 1000 / timeWindowSeconds;
-    redis.incr(label+boxNumber);
-    long requests = Long.parseLong(redis.get(label+boxNumber));
-    System.out.println("requests "+requests);
-    return requests <= maxRequestCount;
+    redis.zremrangeByScore(label, 0, time - timeWindowSeconds * 1000);
+    boolean allow = redis.zcard(label) < maxRequestCount;
+    if (allow) {
+      redis.zadd(label, (double) time, ""+time);
+    }
+    return allow;
   }
 
   public static void main(String[] args) {
