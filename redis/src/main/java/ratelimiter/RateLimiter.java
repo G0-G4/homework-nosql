@@ -19,11 +19,17 @@ public class RateLimiter {
     this.label = label;
     this.maxRequestCount = maxRequestCount;
     this.timeWindowSeconds = timeWindowSeconds;
+    redis.flushAll();
   }
 
   public boolean pass() {
-    // TODO: Implementation
-    return false;
+    long time = System.currentTimeMillis();
+    redis.zremrangeByScore(label, 0, time - timeWindowSeconds * 1000);
+    boolean allow = redis.zcard(label) < maxRequestCount;
+    if (allow) {
+      redis.zadd(label, (double) time, ""+time);
+    }
+    return allow;
   }
 
   public static void main(String[] args) {
